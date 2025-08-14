@@ -1,14 +1,3 @@
-"""
-Personal Finance Chatbot - Single Streamlit App
-Run: streamlit run personal_finance_chatbot.py
-
-Features:
-- Home
-- NLU Analysis
-- Q&A (local KB, semantic search, plus PDF Q&A with HuggingFace & optional Granite)
-- Budget Summary
-"""
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -16,7 +5,7 @@ from datetime import datetime
 from io import StringIO
 import fitz  # PyMuPDF
 
-# Optional heavy imports (wrapped)
+# Optional heavy imports
 try:
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.metrics.pairwise import linear_kernel
@@ -41,13 +30,13 @@ except:
 st.set_page_config(page_title="Personal Finance Chatbot", layout="wide", page_icon="💸")
 APP_TITLE = "Personal Finance Chatbot"
 
-# HuggingFace Q&A model (load once)
+# HuggingFace Q&A model
 if HF_QA_AVAILABLE:
     hf_qa_model = pipeline("question-answering", model="distilbert-base-cased-distilled-squad")
 else:
     hf_qa_model = None
 
-# Optional Granite
+# Optional Granite model (disabled by default)
 USE_GRANITE = False
 if HF_QA_AVAILABLE and USE_GRANITE:
     granite_model_name = "ibm-granite/granite-3.3-8b-instruct"
@@ -55,7 +44,7 @@ if HF_QA_AVAILABLE and USE_GRANITE:
     granite_model = AutoModelForCausalLM.from_pretrained(granite_model_name, device_map="auto")
     granite_model.eval()
 
-# Optional Watson
+# Optional Watson NLU
 if WATSON_AVAILABLE:
     WATSON_APIKEY = "YOUR_WATSON_APIKEY"
     WATSON_URL = "YOUR_WATSON_URL"
@@ -65,10 +54,46 @@ if WATSON_AVAILABLE:
 else:
     watson_nlp = None
 
-# ---------------------- MAIN ----------------------
+# -------------------- LOGIN SYSTEM --------------------
+USER_CREDENTIALS = {
+    "admin": "1234",
+    "rachana": "hack2025"
+}
+
+def login_page():
+    st.title("🔑 Login to Personal Finance Chatbot")
+    st.write("Please enter your credentials to continue.")
+
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    login_btn = st.button("Login")
+
+    if login_btn:
+        if username in USER_CREDENTIALS and USER_CREDENTIALS[username] == password:
+            st.session_state.logged_in = True
+            st.session_state.username = username
+            st.success(f"Welcome, {username}!")
+            st.rerun()
+        else:
+            st.error("Invalid username or password.")
+
+def logout_button():
+    if st.sidebar.button("🚪 Logout"):
+        st.session_state.logged_in = False
+        st.session_state.username = ""
+        st.rerun()
+
+# Initialize session state variables
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "username" not in st.session_state:
+    st.session_state.username = ""
+
+# ---------------------- MAIN APP ----------------------
 def main():
-    st.title(APP_TITLE)
     st.sidebar.title("Navigation")
+    st.sidebar.write(f"👋 Logged in as: **{st.session_state.username}**")
+    logout_button()
 
     user_type = st.sidebar.radio("I am a:", ("Student", "Professional"))
     page = st.sidebar.selectbox("Choose page", ["Home", "NLU Analysis", "Q&A", "Budget Summary"])
@@ -155,7 +180,6 @@ def personalized_nlu_response(user_type, sentiments, keywords):
 def qa_page(user_type):
     st.header("Finance Q&A (with PDF support)")
 
-    # Local KB Q&A
     uploaded_faq = st.file_uploader("Upload FAQ CSV", type=['csv'])
     if uploaded_faq is not None:
         kb_df = pd.read_csv(uploaded_faq)
@@ -178,7 +202,6 @@ def qa_page(user_type):
         st.markdown(personalized_qa_followup(user_type))
 
     st.markdown("---")
-    # PDF Q&A
     st.subheader("Ask AI from a PDF")
     pdf_file = st.file_uploader("Upload PDF", type="pdf")
     if pdf_file:
@@ -250,6 +273,10 @@ def budget_summary_page(user_type):
     cat = df[df['amount'] < 0].groupby('category')['amount'].sum().abs()
     st.dataframe(cat.reset_index().rename(columns={'amount':'spent'}))
 
-# ---------------------- RUN ----------------------
+# ---------------------- RUN APP ----------------------
 if __name__ == "__main__":
-    main()
+    if not st.session_state.logged_in:
+        login_page()
+        st.stop()
+    else:
+        main()
