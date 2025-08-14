@@ -1,0 +1,8 @@
+streamlit run personal_chatbot.py
+streamlit run personal_finance_chatbot.py
+
+
+
+
+  Local URL: http://localhost:8505
+  Network URL: http://172.20.10.5:8505
